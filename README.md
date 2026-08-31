@@ -1,5 +1,7 @@
 # lnk_builder
 
+*Русская версия: [README.ru.md](README.ru.md)*
+
 Cross-platform builder for links and shortcuts, driven by a single YAML/JSON
 config: **symlinks**, **hardlinks**, **Windows junctions**, **Windows `.lnk`
 shortcuts** and **macOS alias files**.
