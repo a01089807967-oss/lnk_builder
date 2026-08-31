@@ -134,7 +134,61 @@ Catalog Node ID (CNID), настоящий UUID тома, даты создан�
 | `lnk`      | да | да (нативно или генерацией) | да |
 | `alias`    | да, best-effort | да, best-effort | да, наиболее надёжно |
 
-## Установка
+## Установка и развёртывание
+
+### Требования
+
+- Python **3.10 или новее** (`requires-python` в `pyproject.toml`).
+  Проверить: `python3 --version`.
+- `pip` и `git`.
+
+### Шаг 1 — склонировать репозиторий
+
+```bash
+git clone https://github.com/a01089807967-oss/lnk_builder.git
+cd lnk_builder
+```
+
+**Этот шаг важнее, чем кажется.** `pip install -e .` читает
+`pyproject.toml` из *текущей директории* — команду нужно запускать
+именно из склонированной папки `lnk_builder`, а не из домашней
+директории и не из любого другого места. Если запустить не оттуда,
+получится ровно вот это:
+
+```text
+ERROR: file:///Users/you does not appear to be a Python project:
+neither 'setup.py' nor 'pyproject.toml' found.
+```
+
+(`/Users/you` в этом сообщении — та директория, откуда реально была
+запущена команда; на macOS это по умолчанию домашняя директория при
+открытии нового окна Terminal — самая частая причина этой ошибки.)
+Если попали на неё: выполните `pwd`, чтобы увидеть, где вы находитесь
+на самом деле, перейдите (`cd`) в папку `lnk_builder`, созданную
+командой `git clone` выше, и повторите `pip install`.
+
+### Шаг 2 — создать виртуальное окружение (рекомендуется, а на macOS обычно обязательно)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+На современном macOS Python, установленный через Homebrew или с
+python.org, помечен как **«externally managed»** (PEP 668): обычный
+`pip install` вне виртуального окружения блокируется с ошибкой
+`error: externally-managed-environment`. Виртуальное окружение полностью
+обходит эту проблему и является рекомендуемым способом установки любого
+Python-проекта, включая `lnk_builder`.
+
+Важно: `source .venv/bin/activate` действует только в *текущей* сессии
+терминала. При каждом открытии нового окна/вкладки терминала для запуска
+`lnk-builder` нужно выполнить эту команду заново (либо использовать
+форму `python3 -m lnk_builder ...` из раздела [«Быстрый
+старт»](#быстрый-старт), которая тоже работает без активации — если
+указать `python3` именно из `.venv`).
+
+### Шаг 3 — установка
 
 ```bash
 pip install -e ".[all]"     # всё сразу (pylnk3 + mac_alias)
@@ -142,6 +196,25 @@ pip install -e ".[lnk]"     # только backend для .lnk
 pip install -e ".[alias]"   # только backend для alias
 pip install -e .            # только symlink/hardlink/junction
 ```
+
+### Шаг 4 — проверка
+
+```bash
+lnk-builder doctor
+```
+
+На macOS команда должна вывести `Current OS: macos`, отметить `alias`
+как наиболее надёжный именно на этой ОС, а `pylnk3`/`mac_alias` —
+установленными, если использовался `.[all]`/`.[lnk]`/`.[alias]`.
+
+### Частые ошибки установки на macOS
+
+| Ошибка | Причина | Решение |
+|---|---|---|
+| `... does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found` | `pip install -e ...` запущен не в директории склонированного `lnk_builder` (например, из `~`) | `cd` в папку, созданную `git clone` (Шаг 1), проверить `pwd` и `ls pyproject.toml`, повторить `pip install` |
+| `error: externally-managed-environment` | Системный/Homebrew Python на macOS блокирует прямую установку (PEP 668) | Создать и активировать venv (Шаг 2), установить уже в нём. Крайний случай — `pip install --break-system-packages ...`, но так делать не рекомендуется: может затронуть другие инструменты, использующие тот же Python |
+| `zsh: command not found: lnk-builder` (после успешной установки) | В текущем терминале не активирован venv, поэтому его `bin/` не в `PATH` | Выполнить `source .venv/bin/activate` в этом терминале, либо вызывать `python3 -m lnk_builder ...` вместо `lnk-builder ...` |
+| `ModuleNotFoundError: No module named 'pylnk3'` при сборке `.lnk` | Установка была без extra-зависимости `lnk` | `pip install -e ".[lnk]"` (или `".[all]"`) в активном окружении |
 
 ## Быстрый старт
 

@@ -24,7 +24,60 @@ only ever be created natively, on the OS that will host them (see
 | `lnk`      | yes | yes (native or generated) | yes |
 | `alias`    | yes, best-effort | yes, best-effort | yes, most reliable |
 
-## Install
+## Installation & deployment
+
+### Requirements
+
+- Python **3.10 or newer** (`requires-python` in `pyproject.toml`). Check
+  with `python3 --version`.
+- `pip` and `git`.
+
+### Step 1 — clone the repository
+
+```bash
+git clone https://github.com/a01089807967-oss/lnk_builder.git
+cd lnk_builder
+```
+
+**This step matters more than it looks like.** `pip install -e .` reads
+`pyproject.toml` from your *current directory* — it needs to be run from
+inside the cloned `lnk_builder` folder, not from your home directory or
+anywhere else. Running it from the wrong place is exactly what produces:
+
+```text
+ERROR: file:///Users/you does not appear to be a Python project:
+neither 'setup.py' nor 'pyproject.toml' found.
+```
+
+(`/Users/you` in that message is whatever directory the command was run
+from — on macOS that's your home directory by default when you open a
+new Terminal window, which is the #1 cause of this error.) If you land
+on it, run `pwd` to see where you actually are, then `cd` into the
+`lnk_builder` folder created by `git clone` above and re-run `pip
+install`.
+
+### Step 2 — create a virtual environment (recommended, and on macOS usually required)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+On current macOS, Python installed via Homebrew or python.org is
+**"externally managed"** (PEP 668): a bare `pip install` outside a
+virtual environment is blocked with `error:
+externally-managed-environment`. A venv sidesteps this entirely and is
+the recommended way to install any Python project, `lnk_builder`
+included.
+
+Remember: `source .venv/bin/activate` only affects the *current*
+terminal session/tab. Every time you open a new terminal window to run
+`lnk-builder`, re-run that command first (or use the
+`python3 -m lnk_builder ...` form from [Quick start](#quick-start),
+which also works without activating anything as long as you give it the
+venv's own `python3`).
+
+### Step 3 — install
 
 ```bash
 pip install -e ".[all]"     # everything (pylnk3 + mac_alias)
@@ -32,6 +85,25 @@ pip install -e ".[lnk]"     # only the .lnk backend
 pip install -e ".[alias]"   # only the alias backend
 pip install -e .            # symlink/hardlink/junction only
 ```
+
+### Step 4 — verify
+
+```bash
+lnk-builder doctor
+```
+
+On macOS this should report `Current OS: macos`, list `alias` as most
+reliable from this OS, and show `pylnk3`/`mac_alias` as installed if you
+used `.[all]`/`.[lnk]`/`.[alias]`.
+
+### Common macOS installation errors
+
+| Error | Cause | Fix |
+|---|---|---|
+| `... does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found` | `pip install -e ...` was run outside the cloned `lnk_builder` directory (e.g. from `~`) | `cd` into the folder `git clone` created (Step 1), confirm with `pwd` and `ls pyproject.toml`, then re-run `pip install` |
+| `error: externally-managed-environment` | macOS's system/Homebrew Python refuses direct `pip install` (PEP 668) | Create and activate a venv (Step 2) and install inside it. As a last resort, `pip install --break-system-packages ...` works but is not recommended — it can affect other tools that share the same Python |
+| `zsh: command not found: lnk-builder` (after a successful install) | The venv isn't activated in this terminal, so its `bin/` isn't on `PATH` | Run `source .venv/bin/activate` in this terminal, or call `python3 -m lnk_builder ...` instead of `lnk-builder ...` |
+| `ModuleNotFoundError: No module named 'pylnk3'` when building a `.lnk` | Installed without the `lnk` extra | `pip install -e ".[lnk]"` (or `".[all]"`) inside the active environment |
 
 ## Quick start
 
