@@ -183,6 +183,158 @@ links:
 Полный список полей — включая `hardlink`, `junction` и hotkey — смотрите
 в [`examples/links.example.yaml`](examples/links.example.yaml).
 
+## Пошаговая сборка `.lnk`-ярлыков
+
+`.lnk` — флагманский тип ссылки: в отличие от symlink/hardlink/junction,
+это самостоятельный бинарный формат, поэтому `lnk_builder` собирает его
+одинаково независимо от того, на какой ОС запущена сама сборка.
+Реализовано это через [`pylnk3`](https://pypi.org/project/pylnk3/) —
+чистый Python-читатель/писатель формата, без обращения к Windows API,
+`pywin32` или COM.
+
+### Шаг 1 — установить extra-зависимость `lnk`
+
+```bash
+pip install -e ".[lnk]"     # либо ".[all]" — сразу все backend'ы
+```
+
+Проверить, что она встала:
+
+```bash
+lnk-builder doctor
+# ...
+# pylnk3 (lnk backend): installed
+```
+
+### Шаг 2 — написать минимальный конфиг
+
+Обязательны только `type`, `target` и `link_path`. `target` обязан быть в
+**Windows-нотации**, даже если сборка идёт с Linux/macOS — см.
+[отдельный разбор этого нюанса ниже](#windows-нотация-путей-обязательна).
+
+```yaml
+# shortcut.yaml
+version: 1
+links:
+  - type: lnk
+    target: "C:\\Program Files\\MyApp\\app.exe"
+    link_path: "./MyApp.lnk"
+```
+
+### Шаг 3 — проверить конфиг, ничего не создавая
+
+```bash
+lnk-builder validate shortcut.yaml
+# [OK] lnk: ./MyApp.lnk — validated (dry run, nothing written)
+```
+
+`validate` прогоняет все проверки предусловий backend'а (включая проверку
+Windows-нотации пути), не трогая файловую систему.
+
+### Шаг 4 — собрать ярлык
+
+```bash
+lnk-builder build shortcut.yaml
+# [OK] lnk: ./MyApp.lnk — .lnk shortcut created
+```
+
+### Шаг 5 — проверить результат
+
+На Linux/macOS утилита `file` независимо распознаёт формат:
+
+```bash
+$ file MyApp.lnk
+MyApp.lnk: MS Windows shortcut, ... window=normal, ...
+```
+
+Либо прочитать файл программно той же библиотекой, что его создала:
+
+```python
+import pylnk3
+
+shortcut = pylnk3.parse("MyApp.lnk")
+print(shortcut.arguments, shortcut.description, shortcut.icon, shortcut.hot_key)
+```
+
+### Полный пример со всеми полями
+
+```yaml
+version: 1
+links:
+  - type: lnk
+    target: "C:\\Program Files\\MyApp\\app.exe"
+    link_path: "C:\\Users\\me\\Desktop\\MyApp.lnk"
+    arguments: "--start-minimized"          # аргументы командной строки
+    description: "Launch MyApp"             # описание/подсказка ярлыка
+    working_directory: "C:\\Program Files\\MyApp"  # рабочая директория
+    icon_location: "C:\\Program Files\\MyApp\\app.exe"  # файл с иконкой
+    icon_index: 0                           # индекс иконки внутри файла
+    window_style: Normal                    # Normal | Maximized | Minimized
+    hotkey: "CONTROL+ALT+M"                 # глобальная комбинация клавиш
+    overwrite: true                         # заменить link_path, если он есть
+```
+
+| Поле | Что означает |
+|---|---|
+| `arguments` | Аргументы командной строки, передаваемые `target` |
+| `description` | Показывается как подсказка/описание ярлыка |
+| `working_directory` | Рабочая директория запуска («Start in») |
+| `icon_location` / `icon_index` | Файл с иконкой и её индекс внутри него |
+| `window_style` | `Normal`, `Maximized` или `Minimized` |
+| `hotkey` | напр. `"CONTROL+ALT+M"` — распознаются только модификаторы `CONTROL`/`ALT`/`SHIFT` (не `CTRL`) |
+
+### Сборка из Python-библиотеки вместо CLI
+
+```python
+from lnk_builder import LnkSpec, build_link
+
+spec = LnkSpec(
+    type="lnk",
+    target=r"C:\Program Files\MyApp\app.exe",
+    link_path=r"C:\Users\me\Desktop\MyApp.lnk",
+    arguments="--start-minimized",
+    description="Launch MyApp",
+    window_style="Maximized",
+)
+result = build_link(spec)
+print(result.ok, result.message)
+```
+
+### Windows-нотация путей обязательна
+
+`target`, `icon_location` и `working_directory` должны выглядеть как
+`C:\...` или UNC-путь `\\server\share\...` — именно этого ожидает
+`pylnk3` внутри себя при сборке списка идентификаторов элементов
+оболочки, и `lnk_builder` проверяет это заранее:
+
+```yaml
+links:
+  - type: lnk
+    target: /opt/app/tool          # ✗ POSIX-путь — будет отклонён
+    link_path: "./tool.lnk"
+```
+
+```text
+$ lnk-builder validate shortcut.yaml
+[FAIL] lnk: ./tool.lnk — target='/opt/app/tool' does not look like a
+Windows path. lnk files need Windows notation, e.g. 'C:\Apps\tool.exe'...
+```
+
+Автоматического перевода POSIX-пути в Windows-путь нет — путь нужно
+писать в буквальной Windows-нотации, так, как он понадобится ярлыку на
+машине, где он будет запускаться.
+
+### Пересборка / перезапись ярлыка
+
+Повторный запуск `build` поверх уже существующего `link_path` по
+умолчанию завершится ошибкой (`LinkAlreadyExistsError`). Либо укажите
+`overwrite: true` у конкретной записи, либо передайте `--force`, чтобы
+разом заменить все ссылки из конфига:
+
+```bash
+lnk-builder build shortcut.yaml --force
+```
+
 ## Справочник CLI
 
 - `lnk-builder build CONFIG [--force] [--dry-run] [--continue-on-error]` —

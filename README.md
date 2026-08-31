@@ -73,6 +73,155 @@ links:
 See [`examples/links.example.yaml`](examples/links.example.yaml) for every
 field, including `hardlink`, `junction` and hotkeys.
 
+## Building `.lnk` shortcuts, step by step
+
+`.lnk` is the flagship link type: unlike symlink/hardlink/junction, it's a
+self-contained binary format, so `lnk_builder` builds it the same way no
+matter which OS the build itself runs on. It does so through
+[`pylnk3`](https://pypi.org/project/pylnk3/), a pure-Python reader/writer
+for the format — no Windows API, no `pywin32`, no COM.
+
+### Step 1 — install the `lnk` extra
+
+```bash
+pip install -e ".[lnk]"     # or ".[all]" for every backend
+```
+
+Confirm it landed:
+
+```bash
+lnk-builder doctor
+# ...
+# pylnk3 (lnk backend): installed
+```
+
+### Step 2 — write a minimal config
+
+Only `type`, `target` and `link_path` are required. `target` must be in
+**Windows notation** even if you're building from Linux/macOS — see
+[the gotcha below](#windows-path-notation-is-mandatory).
+
+```yaml
+# shortcut.yaml
+version: 1
+links:
+  - type: lnk
+    target: "C:\\Program Files\\MyApp\\app.exe"
+    link_path: "./MyApp.lnk"
+```
+
+### Step 3 — validate before writing anything
+
+```bash
+lnk-builder validate shortcut.yaml
+# [OK] lnk: ./MyApp.lnk — validated (dry run, nothing written)
+```
+
+`validate` runs every backend's precondition checks (including the
+Windows-path-notation check) without touching the filesystem.
+
+### Step 4 — build it
+
+```bash
+lnk-builder build shortcut.yaml
+# [OK] lnk: ./MyApp.lnk — .lnk shortcut created
+```
+
+### Step 5 — verify the result
+
+On Linux/macOS, `file` independently recognizes the format:
+
+```bash
+$ file MyApp.lnk
+MyApp.lnk: MS Windows shortcut, ... window=normal, ...
+```
+
+Or inspect it programmatically with the same library that wrote it:
+
+```python
+import pylnk3
+
+shortcut = pylnk3.parse("MyApp.lnk")
+print(shortcut.arguments, shortcut.description, shortcut.icon, shortcut.hot_key)
+```
+
+### A full example with every field
+
+```yaml
+version: 1
+links:
+  - type: lnk
+    target: "C:\\Program Files\\MyApp\\app.exe"
+    link_path: "C:\\Users\\me\\Desktop\\MyApp.lnk"
+    arguments: "--start-minimized"          # command-line arguments
+    description: "Launch MyApp"             # tooltip / shortcut description
+    working_directory: "C:\\Program Files\\MyApp"  # startup directory
+    icon_location: "C:\\Program Files\\MyApp\\app.exe"  # icon source file
+    icon_index: 0                           # icon index inside that file
+    window_style: Normal                    # Normal | Maximized | Minimized
+    hotkey: "CONTROL+ALT+M"                 # global shortcut key
+    overwrite: true                         # replace link_path if it exists
+```
+
+| Field | Meaning |
+|---|---|
+| `arguments` | Command-line arguments passed to `target` |
+| `description` | Shown as the shortcut's tooltip/description |
+| `working_directory` | "Start in" directory |
+| `icon_location` / `icon_index` | Icon file and the icon's index inside it |
+| `window_style` | `Normal`, `Maximized` or `Minimized` |
+| `hotkey` | e.g. `"CONTROL+ALT+M"` — only `CONTROL`/`ALT`/`SHIFT` modifiers are recognized (not `CTRL`) |
+
+### Building from the Python library instead of the CLI
+
+```python
+from lnk_builder import LnkSpec, build_link
+
+spec = LnkSpec(
+    type="lnk",
+    target=r"C:\Program Files\MyApp\app.exe",
+    link_path=r"C:\Users\me\Desktop\MyApp.lnk",
+    arguments="--start-minimized",
+    description="Launch MyApp",
+    window_style="Maximized",
+)
+result = build_link(spec)
+print(result.ok, result.message)
+```
+
+### Windows path notation is mandatory
+
+`target`, `icon_location` and `working_directory` must look like
+`C:\...` or a UNC path `\\server\share\...` — this is what `pylnk3`
+expects internally to build the shell item ID list, and `lnk_builder`
+validates it upfront:
+
+```yaml
+links:
+  - type: lnk
+    target: /opt/app/tool          # ✗ POSIX path — rejected
+    link_path: "./tool.lnk"
+```
+
+```text
+$ lnk-builder validate shortcut.yaml
+[FAIL] lnk: ./tool.lnk — target='/opt/app/tool' does not look like a
+Windows path. lnk files need Windows notation, e.g. 'C:\Apps\tool.exe'...
+```
+
+There is no automatic POSIX-to-Windows translation — write the Windows
+path literally, as the shortcut will need it on the machine that runs it.
+
+### Rebuilding / overwriting a shortcut
+
+Re-running `build` on an existing `link_path` fails by default
+(`LinkAlreadyExistsError`). Either set `overwrite: true` on that entry, or
+pass `--force` to replace every link in the config in one go:
+
+```bash
+lnk-builder build shortcut.yaml --force
+```
+
 ## CLI reference
 
 - `lnk-builder build CONFIG [--force] [--dry-run] [--continue-on-error]` —
