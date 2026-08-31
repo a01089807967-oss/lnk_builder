@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lnk_builder"
+version = "0.1.0"
+description = "Cross-platform builder for symlinks, hardlinks, Windows junctions, .lnk shortcuts and macOS aliases"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "lnk_builder contributors" }]
+keywords = ["symlink", "hardlink", "junction", "lnk", "shortcut", "alias", "macos", "windows"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Topic :: System :: Filesystems",
+  "Topic :: Utilities",
+]
+dependencies = [
+  "pydantic>=2.0",
+  "pyyaml>=6.0",
+  "click>=8.1",
+]
+
+[project.optional-dependencies]
+lnk = ["pylnk3>=0.4.3"]
+alias = ["mac_alias>=2.2.0"]
+all = ["pylnk3>=0.4.3", "mac_alias>=2.2.0"]
+dev = [
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+  "mypy>=1.0",
+  "ruff>=0.4",
+  "pylnk3>=0.4.3",
+  "mac_alias>=2.2.0",
+]
+
+[project.scripts]
+lnk-builder = "lnk_builder.cli:main"
+
+[project.urls]
+Repository = "https://github.com/a01089807967-oss/lnk_builder"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lnk_builder"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true

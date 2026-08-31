@@ -1,0 +1,38 @@
+version: 1
+
+defaults:
+  overwrite: false
+  platform: auto
+
+links:
+  - type: symlink
+    target: /opt/app/bin/tool
+    link_path: /usr/local/bin/tool
+    overwrite: true
+
+  - type: hardlink
+    target: /data/shared/report.csv
+    link_path: /data/exports/report.csv
+
+  - type: junction
+    target: C:\Data\Shared
+    link_path: C:\Users\me\Links\Shared
+    platform: windows
+
+  - type: lnk
+    target: "C:\\Program Files\\MyApp\\app.exe"
+    link_path: "C:\\Users\\me\\Desktop\\MyApp.lnk"
+    arguments: "--start-minimized"
+    description: "Launch MyApp"
+    working_directory: "C:\\Program Files\\MyApp"
+    icon_location: "C:\\Program Files\\MyApp\\app.exe"
+    icon_index: 0
+    window_style: Normal
+    hotkey: "CONTROL+ALT+M"
+
+  - type: alias
+    target: /Applications/MyApp.app
+    link_path: "/Users/me/Desktop/MyApp alias"
+    volume_name: "Macintosh HD"
+    volume_uuid: "5C0B4B8E-2C2E-4F0A-9C3D-11223344AABB"
+    best_effort_finder_flag: true

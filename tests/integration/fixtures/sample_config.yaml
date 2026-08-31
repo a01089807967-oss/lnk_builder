@@ -1,0 +1,14 @@
+version: 1
+
+defaults:
+  overwrite: false
+
+links:
+  - type: symlink
+    target: "{target}"
+    link_path: "{link_path}"
+
+  - type: lnk
+    target: "C:\\Program Files\\MyApp\\app.exe"
+    link_path: "{lnk_path}"
+    description: "Launch MyApp"
