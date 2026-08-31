@@ -150,27 +150,36 @@ print(shortcut.arguments, shortcut.description, shortcut.icon, shortcut.hot_key)
 ```yaml
 version: 1
 links:
-  - type: lnk
-    target: "C:\\Program Files\\MyApp\\app.exe"
-    link_path: "C:\\Users\\me\\Desktop\\MyApp.lnk"
-    arguments: "--start-minimized"          # command-line arguments
-    description: "Launch MyApp"             # tooltip / shortcut description
-    working_directory: "C:\\Program Files\\MyApp"  # startup directory
+  - type: lnk                                    # required — selects this backend
+    target: "C:\\Program Files\\MyApp\\app.exe"   # required — Windows-notation path
+    link_path: "C:\\Users\\me\\Desktop\\MyApp.lnk"  # required — must end in .lnk yourself
+    platform: auto                                # accepted, but ignored (see notes below)
+    overwrite: true                                # replace link_path if it exists
+    arguments: "--start-minimized"                 # command-line arguments
+    description: "Launch MyApp"                    # tooltip / shortcut description
+    working_directory: "C:\\Program Files\\MyApp"  # startup ("Start in") directory
     icon_location: "C:\\Program Files\\MyApp\\app.exe"  # icon source file
-    icon_index: 0                           # icon index inside that file
-    window_style: Normal                    # Normal | Maximized | Minimized
-    hotkey: "CONTROL+ALT+M"                 # global shortcut key
-    overwrite: true                         # replace link_path if it exists
+    icon_index: 0                                  # icon index inside that file
+    window_style: Normal                           # Normal | Maximized | Minimized
+    hotkey: "CONTROL+ALT+M"                        # global shortcut key
 ```
 
-| Field | Meaning |
-|---|---|
-| `arguments` | Command-line arguments passed to `target` |
-| `description` | Shown as the shortcut's tooltip/description |
-| `working_directory` | "Start in" directory |
-| `icon_location` / `icon_index` | Icon file and the icon's index inside it |
-| `window_style` | `Normal`, `Maximized` or `Minimized` |
-| `hotkey` | e.g. `"CONTROL+ALT+M"` — only `CONTROL`/`ALT`/`SHIFT` modifiers are recognized (not `CTRL`) |
+#### Field reference
+
+| Field | Required | Type / allowed values | Default | What it does |
+|---|---|---|---|---|
+| `type` | yes | `lnk` | — | Selects the `.lnk` backend. |
+| `target` | yes | Windows-notation string: `C:\...` or UNC `\\server\share\...` | — | What the shortcut launches. Validated to *look like* a Windows path before anything is written; it does **not** need to exist on the machine running the build — `pylnk3` builds the shell item ID list straight from the string, which is exactly what makes cross-platform generation possible. |
+| `link_path` | yes | any path on the machine running the build (POSIX or Windows notation, whichever your OS uses) | — | Where the `.lnk` file is written. Used exactly as given — `lnk_builder` does **not** append a `.lnk` extension for you, so include it yourself (Explorer relies on it to recognize the file as a shortcut). |
+| `platform` | no | `auto` \| `windows` \| `linux` \| `macos` | `auto` | Accepted for schema consistency with the other link types, but the `lnk` backend's `validate()` never reads it — `.lnk` generation is always cross-platform, so this field has **no effect** here (unlike `symlink`/`hardlink`/`junction`, where it's enforced). Safe to omit. |
+| `overwrite` | no | `true` \| `false` | `false` | Replace `link_path` if a file already exists there; otherwise the build fails with `LinkAlreadyExistsError` (or use `--force` on the whole config instead). |
+| `arguments` | no | string | *(none)* | Command-line arguments appended when the shortcut is launched. |
+| `description` | no | string | *(none)* | The shortcut's tooltip/description text (shown by Explorer). |
+| `working_directory` | no | Windows-notation string | *(none)* | The "Start in" directory the target is launched with. Validated the same way as `target`. |
+| `icon_location` | no | Windows-notation string | *(none, falls back to the target's own icon)* | Path to the file the icon is read from — typically the same `.exe`, or a dedicated `.ico`/`.dll`. Validated the same way as `target`. |
+| `icon_index` | no | integer | `0` | Index of the icon *inside* `icon_location`, for files that bundle several icons (an `.exe`/`.dll` resource, or a multi-image `.ico`). `0` is the first/only icon. |
+| `window_style` | no | exactly one of `Normal`, `Maximized`, `Minimized` (case-sensitive) | `Normal` | The window state the target is launched in. |
+| `hotkey` | no | `"<modifier>[+<modifier>]+<key>"`, e.g. `"CONTROL+ALT+M"` | *(none)* | A global keyboard shortcut that activates this `.lnk`. Modifiers: `CONTROL`, `ALT`, `SHIFT` only — **not** `CTRL`. Key: `0`-`9`, `A`-`Z`, `F1`-`F24`, `NUM LOCK` or `SCROLL LOCK`. Checked upfront, so a typo fails at `validate`/`build` time with a clear message rather than a cryptic error mid-write. |
 
 ### Building from the Python library instead of the CLI
 

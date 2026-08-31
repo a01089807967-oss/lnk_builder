@@ -261,27 +261,36 @@ print(shortcut.arguments, shortcut.description, shortcut.icon, shortcut.hot_key)
 ```yaml
 version: 1
 links:
-  - type: lnk
-    target: "C:\\Program Files\\MyApp\\app.exe"
-    link_path: "C:\\Users\\me\\Desktop\\MyApp.lnk"
-    arguments: "--start-minimized"          # аргументы командной строки
-    description: "Launch MyApp"             # описание/подсказка ярлыка
-    working_directory: "C:\\Program Files\\MyApp"  # рабочая директория
+  - type: lnk                                    # обязательно — выбирает этот backend
+    target: "C:\\Program Files\\MyApp\\app.exe"   # обязательно — путь в Windows-нотации
+    link_path: "C:\\Users\\me\\Desktop\\MyApp.lnk"  # обязательно — .lnk дописывается вручную
+    platform: auto                                # принимается, но не влияет ни на что (см. ниже)
+    overwrite: true                                # заменить link_path, если он есть
+    arguments: "--start-minimized"                 # аргументы командной строки
+    description: "Launch MyApp"                    # описание/подсказка ярлыка
+    working_directory: "C:\\Program Files\\MyApp"  # рабочая директория запуска («Start in»)
     icon_location: "C:\\Program Files\\MyApp\\app.exe"  # файл с иконкой
-    icon_index: 0                           # индекс иконки внутри файла
-    window_style: Normal                    # Normal | Maximized | Minimized
-    hotkey: "CONTROL+ALT+M"                 # глобальная комбинация клавиш
-    overwrite: true                         # заменить link_path, если он есть
+    icon_index: 0                                  # индекс иконки внутри файла
+    window_style: Normal                           # Normal | Maximized | Minimized
+    hotkey: "CONTROL+ALT+M"                        # глобальная комбинация клавиш
 ```
 
-| Поле | Что означает |
-|---|---|
-| `arguments` | Аргументы командной строки, передаваемые `target` |
-| `description` | Показывается как подсказка/описание ярлыка |
-| `working_directory` | Рабочая директория запуска («Start in») |
-| `icon_location` / `icon_index` | Файл с иконкой и её индекс внутри него |
-| `window_style` | `Normal`, `Maximized` или `Minimized` |
-| `hotkey` | напр. `"CONTROL+ALT+M"` — распознаются только модификаторы `CONTROL`/`ALT`/`SHIFT` (не `CTRL`) |
+#### Справочник по полям
+
+| Поле | Обязательно | Тип / допустимые значения | По умолчанию | Что делает |
+|---|---|---|---|---|
+| `type` | да | `lnk` | — | Выбирает backend для `.lnk`. |
+| `target` | да | строка в Windows-нотации: `C:\...` либо UNC `\\server\share\...` | — | Что запускает ярлык. Проверяется только *формат* строки перед записью; физически на машине сборки путь существовать не обязан — `pylnk3` строит список идентификаторов элементов оболочки прямо из строки, именно это и делает кроссплатформенную генерацию возможной. |
+| `link_path` | да | любой путь на машине, где идёт сборка (в POSIX- или Windows-нотации — как принято на вашей ОС) | — | Куда записывается `.lnk`-файл. Используется как есть — `lnk_builder` **не** дописывает расширение `.lnk` сам, добавьте его вручную (Explorer по нему опознаёт файл как ярлык). |
+| `platform` | нет | `auto` \| `windows` \| `linux` \| `macos` | `auto` | Принимается для единообразия схемы с другими типами ссылок, но backend `lnk` в `validate()` его вообще не читает — генерация `.lnk` всегда кроссплатформенна, поэтому здесь это поле **ни на что не влияет** (в отличие от `symlink`/`hardlink`/`junction`, где оно строго проверяется). Можно спокойно не указывать. |
+| `overwrite` | нет | `true` \| `false` | `false` | Заменить `link_path`, если файл там уже есть; иначе сборка упадёт с `LinkAlreadyExistsError` (либо используйте `--force` для всего конфига). |
+| `arguments` | нет | строка | *(нет)* | Аргументы командной строки, добавляемые при запуске ярлыка. |
+| `description` | нет | строка | *(нет)* | Текст подсказки/описания ярлыка (показывается в Explorer). |
+| `working_directory` | нет | строка в Windows-нотации | *(нет)* | Рабочая директория запуска («Start in»). Проверяется так же, как `target`. |
+| `icon_location` | нет | строка в Windows-нотации | *(нет, тогда берётся собственная иконка target)* | Файл, откуда берётся иконка — обычно тот же `.exe`, либо отдельный `.ico`/`.dll`. Проверяется так же, как `target`. |
+| `icon_index` | нет | целое число | `0` | Индекс иконки *внутри* `icon_location`, если в файле их несколько (ресурсы `.exe`/`.dll` или многостраничный `.ico`). `0` — первая/единственная иконка. |
+| `window_style` | нет | ровно одно из: `Normal`, `Maximized`, `Minimized` (регистр важен) | `Normal` | Состояние окна, с которым запускается target. |
+| `hotkey` | нет | `"<модификатор>[+<модификатор>]+<клавиша>"`, напр. `"CONTROL+ALT+M"` | *(нет)* | Глобальная комбинация клавиш, активирующая этот `.lnk`. Модификаторы — только `CONTROL`, `ALT`, `SHIFT` (**не** `CTRL`). Клавиша — `0`-`9`, `A`-`Z`, `F1`-`F24`, `NUM LOCK` или `SCROLL LOCK`. Проверяется заранее, поэтому опечатка падает на `validate`/`build` с понятным сообщением, а не невнятной ошибкой посреди записи файла. |
 
 ### Сборка из Python-библиотеки вместо CLI
 
